@@ -1,4 +1,4 @@
-import { chromium } from "playwright";
+import { BrowserContext, chromium, ChromiumBrowser } from "playwright";
 import {
   TimeSlots,
   type AvailabilityResponse,
@@ -21,9 +21,36 @@ function formatDate(d: moment.Moment): string {
   return d.format("YYYY-MM-DD");
 }
 
+// init browser and context instances
+let browserPromise: Promise<ChromiumBrowser> | null = null;
+let contextPromise: Promise<BrowserContext> | null = null;
+
+async function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = chromium.launch({
+      headless: true,
+      // Required for Vercel serverless environment
+      args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox"],
+    });
+  }
+  return browserPromise;
+}
+
+async function getContext() {
+  if (!contextPromise) {
+    const browser = await getBrowser();
+    contextPromise = browser.newContext({
+      // You can add default context options here
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    });
+  }
+  return contextPromise;
+}
+
 async function getAvailability(): Promise<AvailabilityResponse> {
-  const browser = await chromium.launch();
-  const page = await browser.newPage();
+  const context = await getContext();
+  const page = await context.newPage();
 
   await page.goto(BOOKING_PAGE);
 
@@ -86,15 +113,30 @@ async function getAvailability(): Promise<AvailabilityResponse> {
     }
   );
 
-  await browser.close();
+  await page.close();
 
   return res;
+}
+
+export async function cleanup() {
+  if (contextPromise) {
+    const context = await contextPromise;
+    await context.close();
+    contextPromise = null;
+  }
+  if (browserPromise) {
+    const browser = await browserPromise;
+    await browser.close();
+    browserPromise = null;
+  }
 }
 
 export async function scrape() {
   const {
     body: { availability },
   } = await getAvailability();
+
+  cleanup();
 
   // only care about Lowell courts with nets because thats where I play
   const courts = availability.resources.filter((resource) =>
