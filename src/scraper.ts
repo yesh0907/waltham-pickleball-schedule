@@ -1,10 +1,10 @@
-import { BrowserContext, chromium, ChromiumBrowser } from "playwright";
+import puppeteer, { Browser, Page } from "puppeteer";
 import {
   TimeSlots,
   type AvailabilityResponse,
   type CourtSchedule,
   type Schedule,
-} from "@/types/scraper.types";
+} from "./types";
 import moment from "moment-timezone";
 
 const BOOKING_PAGE =
@@ -21,36 +21,35 @@ function formatDate(d: moment.Moment): string {
   return d.format("YYYY-MM-DD");
 }
 
-// init browser and context instances
-let browserPromise: Promise<ChromiumBrowser> | null = null;
-let contextPromise: Promise<BrowserContext> | null = null;
+// init browser instance
+let browserPromise: Promise<Browser> | null = null;
 
 async function getBrowser() {
   if (!browserPromise) {
-    browserPromise = chromium.launch({
+    browserPromise = puppeteer.launch({
+      executablePath:
+        process.env.NODE_ENV !== "development"
+          ? process.env.CHROME_EXECUTABLE_PATH || "/usr/bin/google-chrome"
+          : undefined,
       headless: true,
-      // Required for Vercel serverless environment
-      args: ["--disable-gpu", "--no-sandbox", "--disable-setuid-sandbox"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-gpu",
+        "--disable-software-rasterizer",
+      ],
     });
   }
   return browserPromise;
 }
 
-async function getContext() {
-  if (!contextPromise) {
-    const browser = await getBrowser();
-    contextPromise = browser.newContext({
-      // You can add default context options here
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    });
-  }
-  return contextPromise;
-}
-
 async function getAvailability(): Promise<AvailabilityResponse> {
-  const context = await getContext();
-  const page = await context.newPage();
+  const browser = await getBrowser();
+  const page = await browser.newPage();
+
+  await page.setUserAgent(
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+  );
 
   await page.goto(BOOKING_PAGE);
 
@@ -119,11 +118,6 @@ async function getAvailability(): Promise<AvailabilityResponse> {
 }
 
 export async function cleanup() {
-  if (contextPromise) {
-    const context = await contextPromise;
-    await context.close();
-    contextPromise = null;
-  }
   if (browserPromise) {
     const browser = await browserPromise;
     await browser.close();
