@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { scrape } from "./scraper";
 import { createClient } from "redis";
 import { formatDate, getTdyDate } from "./utils";
+import { cors } from "hono/cors";
 
 const client = createClient({
   url: process.env.REDIS_URL,
@@ -14,6 +15,11 @@ client.on("error", (err) => {
 await client.connect();
 
 const app = new Hono();
+
+// enable cors for all routes
+app.use(cors({
+  origin: '*'
+}));
 
 app.get("/", (c) => {
   return c.text("Hello PB Scraper!");
