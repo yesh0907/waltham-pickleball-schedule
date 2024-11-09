@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { scrape } from "./scraper";
 import { createClient } from "redis";
+import { formatDate, getTdyDate } from "./utils";
 
 const client = createClient({
   url: process.env.REDIS_URL,
@@ -28,6 +29,22 @@ app.get("/scrape", async (c) => {
     },
     200
   );
+});
+
+app.get("/schedules", async (c) => {
+  const date = formatDate(getTdyDate());
+  const schedules = await client.get(date);
+  if (!schedules) {
+    return c.json({
+      schedules: null,
+      error: true,
+      message: "no schedules available",
+    });
+  }
+  return c.json({
+    schedules: JSON.parse(schedules),
+    error: false,
+  });
 });
 
 export default app;

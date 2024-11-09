@@ -1,25 +1,16 @@
-import puppeteer, { Browser, Page } from "puppeteer";
+import puppeteer, { Browser } from "puppeteer";
 import {
   TimeSlots,
   type AvailabilityResponse,
   type CourtSchedule,
   type Schedule,
 } from "./types";
-import moment from "moment-timezone";
+import { formatDate, getTmrDate } from "./utils";
 
 const BOOKING_PAGE =
   "https://anc.apm.activecommunities.com/walthamrecreation/reservation/landing/quick?locale=en-US&groupId=2";
 const AVAILABILITY_ENDPOINT =
   "https://anc.apm.activecommunities.com/walthamrecreation/rest/reservation/quickreservation/availability?locale=en-US";
-
-function getTmrDate(): moment.Moment {
-  return moment().tz("America/New_York").add(1, "day").startOf("day");
-}
-
-// format date to be like the following 2024-10-19
-function formatDate(d: moment.Moment): string {
-  return d.format("YYYY-MM-DD");
-}
 
 // init browser instance
 let browserPromise: Promise<Browser> | null = null;
